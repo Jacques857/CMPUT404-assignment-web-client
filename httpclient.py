@@ -21,6 +21,7 @@
 import sys
 import socket
 import re
+import select
 # you may use urllib to encode data appropriately
 import urllib.parse
 
@@ -43,7 +44,7 @@ class HTTPClient(object):
     def get_code(self, data):
         return None
 
-    def get_headers(self,data):
+    def get_headers(self, data):
         return None
 
     def get_body(self, data):
@@ -59,8 +60,15 @@ class HTTPClient(object):
     def recvall(self, sock):
         buffer = bytearray()
         done = False
+        # wait until data is ready until recv
+        # Source: Daniel Stutzbach, StackOverflow, https://stackoverflow.com/a/2721734/16789333
+        #sock.setblocking(0)
+        #ready = select.select([sock], [], [], 5)
         while not done:
+            #if ready[0]:
             part = sock.recv(1024)
+            #else:
+                #return None
             if (part):
                 buffer.extend(part)
             else:
@@ -68,11 +76,34 @@ class HTTPClient(object):
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPResponse(code, body)
+        # build a request
+        request = build_get_request(url)
+        print("REQUEST:", request)
+
+        # connect to the server
+        self.connect(get_host(url), get_port(url))
+        print("CONNECTED")
+
+        # make a GET request to the given url
+        self.sendall(request)
+        print("SENT")
+
+        # read the response
+        response = self.recvall(self.socket)
+        print("RECEIVED")
+
+        # close the connection
+        self.close()
+
+        # extract the status code and body of the response
+        self.get_code(response)
+        self.get_body(response)
+
+        return
+        #return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
+        print("Post args:", args)
         code = 500
         body = ""
         return HTTPResponse(code, body)
@@ -82,6 +113,29 @@ class HTTPClient(object):
             return self.POST( url, args )
         else:
             return self.GET( url, args )
+
+def build_get_request(url):
+    # request line
+    request = "GET " + url + " HTTP/1.1\r\n"
+    # headers
+    request += "Host: " + get_host(url) + "\r\n"
+    # final CRLF
+    request += "\r\n"
+
+    return request
+
+def get_host(url):
+    startIndex = url.index("//") + 2
+    endIndex = startIndex + url[startIndex:].index(":")
+    host = url[startIndex:endIndex]
+    return host
+
+def get_port(url):
+    hostStartIndex = url.index("//") + 2
+    startIndex = hostStartIndex + url[hostStartIndex:].index(":") + 1
+    endIndex = startIndex + url[startIndex:].index("/")
+    port = url[startIndex:endIndex]
+    return int(port)
     
 if __name__ == "__main__":
     client = HTTPClient()
