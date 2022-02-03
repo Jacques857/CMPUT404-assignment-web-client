@@ -42,13 +42,16 @@ class HTTPClient(object):
         return None
 
     def get_code(self, data):
-        return None
+        startIndex = data.index(" ") + 1
+        endIndex = startIndex + data[startIndex:].index(" ")
+        return int(data[startIndex:endIndex])
 
     def get_headers(self, data):
         return None
 
     def get_body(self, data):
-        return None
+        startIndex = data.index("\r\n\r\n") + 4
+        return data[startIndex:]
     
     def sendall(self, data):
         self.socket.sendall(data.encode('utf-8'))
@@ -60,15 +63,8 @@ class HTTPClient(object):
     def recvall(self, sock):
         buffer = bytearray()
         done = False
-        # wait until data is ready until recv
-        # Source: Daniel Stutzbach, StackOverflow, https://stackoverflow.com/a/2721734/16789333
-        #sock.setblocking(0)
-        #ready = select.select([sock], [], [], 5)
         while not done:
-            #if ready[0]:
             part = sock.recv(1024)
-            #else:
-                #return None
             if (part):
                 buffer.extend(part)
             else:
@@ -78,34 +74,47 @@ class HTTPClient(object):
     def GET(self, url, args=None):
         # build a request
         request = build_get_request(url)
-        print("REQUEST:", request)
 
         # connect to the server
         self.connect(get_host(url), get_port(url))
-        print("CONNECTED")
 
         # make a GET request to the given url
         self.sendall(request)
-        print("SENT")
 
         # read the response
         response = self.recvall(self.socket)
-        print("RECEIVED")
 
         # close the connection
         self.close()
 
         # extract the status code and body of the response
-        self.get_code(response)
-        self.get_body(response)
+        code = self.get_code(response)
+        body = self.get_body(response)
 
-        return
-        #return HTTPResponse(code, body)
+        return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
-        print("Post args:", args)
-        code = 500
-        body = ""
+        print("Post args:", args, "type:", type(args))
+        # build a request
+        request = build_post_request(url, args)
+        print("REQUEST:", request)
+
+        # connect to the server
+        self.connect(get_host(url), get_port(url))
+
+        # make a GET request to the given url
+        self.sendall(request)
+
+        # read the response
+        response = self.recvall(self.socket)
+
+        # close the connection
+        self.close()
+
+        # extract the status code and body of the response
+        code = self.get_code(response)
+        body = self.get_body(response)
+
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
@@ -113,6 +122,40 @@ class HTTPClient(object):
             return self.POST( url, args )
         else:
             return self.GET( url, args )
+
+def build_post_request(url, args):
+    print("ARGS:", args)
+    # request line
+    request = "POST " + url + " HTTP/1.1\r\n"
+    # headers
+    request += "Host: " + get_host(url) + "\r\n"
+    # if we are sending form data
+    if args != None:
+        request += "Content-Type: application/x-www-form-urlencoded\r\n"
+
+    # content
+    content = bytes("", 'utf-8')
+    if args != None:
+        for key in args:
+            print("KEY:", key)
+            print("VALUE:", args[key].encode())
+            content += bytes(key, 'utf-8') + bytes("=", 'utf-8') + bytes(args[key], 'utf-8')
+            content += bytes("&", 'utf-8')
+        # remove the trailing &
+        content = content[:len(content) - 1]
+    print("CONTENT", content)
+    
+    # content length
+    request += "Content-Length: " + str(len(content))
+
+    # CRLF to end headers sections
+    request += "\r\n"
+
+    # append content
+    #request += content.decode('utf-8')
+    #request += "\r\n"
+
+    return request
 
 def build_get_request(url):
     # request line
