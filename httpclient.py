@@ -54,7 +54,7 @@ class HTTPClient(object):
         return data[startIndex:]
     
     def sendall(self, data):
-        self.socket.sendall(data.encode('utf-8'))
+        self.socket.sendall(data)
         
     def close(self):
         self.socket.close()
@@ -79,7 +79,7 @@ class HTTPClient(object):
         self.connect(get_host(url), get_port(url))
 
         # make a GET request to the given url
-        self.sendall(request)
+        self.sendall(request.encode('utf-8'))
 
         # read the response
         response = self.recvall(self.socket)
@@ -94,10 +94,8 @@ class HTTPClient(object):
         return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
-        print("Post args:", args, "type:", type(args))
         # build a request
         request = build_post_request(url, args)
-        print("REQUEST:", request)
 
         # connect to the server
         self.connect(get_host(url), get_port(url))
@@ -124,11 +122,11 @@ class HTTPClient(object):
             return self.GET( url, args )
 
 def build_post_request(url, args):
-    print("ARGS:", args)
     # request line
     request = "POST " + url + " HTTP/1.1\r\n"
     # headers
     request += "Host: " + get_host(url) + "\r\n"
+    request += "User-Agent: CMPUT404/HTTPClient\r\n"
     # if we are sending form data
     if args != None:
         request += "Content-Type: application/x-www-form-urlencoded\r\n"
@@ -137,23 +135,21 @@ def build_post_request(url, args):
     content = bytes("", 'utf-8')
     if args != None:
         for key in args:
-            print("KEY:", key)
-            print("VALUE:", args[key].encode())
             content += bytes(key, 'utf-8') + bytes("=", 'utf-8') + bytes(args[key], 'utf-8')
             content += bytes("&", 'utf-8')
         # remove the trailing &
         content = content[:len(content) - 1]
-    print("CONTENT", content)
     
     # content length
-    request += "Content-Length: " + str(len(content))
+    request += "Content-Length: " + str(len(content)) + "\r\n"
 
     # CRLF to end headers sections
     request += "\r\n"
 
     # append content
-    #request += content.decode('utf-8')
-    #request += "\r\n"
+    request = bytes(request, 'utf-8')
+    request += content
+    request += bytes("\r\n", 'utf-8')
 
     return request
 
@@ -162,6 +158,7 @@ def build_get_request(url):
     request = "GET " + url + " HTTP/1.1\r\n"
     # headers
     request += "Host: " + get_host(url) + "\r\n"
+    request += "User-Agent: CMPUT404/HTTPClient\r\n"
     # final CRLF
     request += "\r\n"
 
@@ -169,16 +166,24 @@ def build_get_request(url):
 
 def get_host(url):
     startIndex = url.index("//") + 2
-    endIndex = startIndex + url[startIndex:].index(":")
+    if ":" in url[startIndex:]:
+        endIndex = startIndex + url[startIndex:].index(":")
+    elif "/" in url[startIndex:]:
+        endIndex = startIndex + url[startIndex:].index("/")
+    else:
+        endIndex = len(url)
     host = url[startIndex:endIndex]
     return host
 
 def get_port(url):
     hostStartIndex = url.index("//") + 2
-    startIndex = hostStartIndex + url[hostStartIndex:].index(":") + 1
-    endIndex = startIndex + url[startIndex:].index("/")
-    port = url[startIndex:endIndex]
-    return int(port)
+    if ":" in url[hostStartIndex:]:
+        startIndex = hostStartIndex + url[hostStartIndex:].index(":") + 1
+        endIndex = startIndex + url[startIndex:].index("/")
+        port = int(url[startIndex:endIndex])
+    else:
+        port = 80
+    return port
     
 if __name__ == "__main__":
     client = HTTPClient()
