@@ -90,6 +90,7 @@ class HTTPClient(object):
         # extract the status code and body of the response
         code = self.get_code(response)
         body = self.get_body(response)
+        print("RESPONSE BODY:", body)
 
         return HTTPResponse(code, body)
 
@@ -112,6 +113,7 @@ class HTTPClient(object):
         # extract the status code and body of the response
         code = self.get_code(response)
         body = self.get_body(response)
+        print("RESPONSE BODY:", body)
 
         return HTTPResponse(code, body)
 
@@ -127,6 +129,7 @@ def build_post_request(url, args):
     # headers
     request += "Host: " + get_host(url) + "\r\n"
     request += "User-Agent: CMPUT404/HTTPClient\r\n"
+    request += "Connection: close\r\n"
     # if we are sending form data
     if args != None:
         request += "Content-Type: application/x-www-form-urlencoded\r\n"
@@ -159,6 +162,7 @@ def build_get_request(url):
     # headers
     request += "Host: " + get_host(url) + "\r\n"
     request += "User-Agent: CMPUT404/HTTPClient\r\n"
+    request += "Connection: close\r\n"
     # final CRLF
     request += "\r\n"
 
